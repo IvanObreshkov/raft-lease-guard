@@ -1,0 +1,99 @@
+// Raft consensus protocol messages, following the RPC definitions in
+// Figure 2 of "In Search of an Understandable Consensus Algorithm"
+// (Ongaro and Ousterhout, 2014).
+//
+// To regenerate Go code, run from the repository root:
+//
+//   protoc --proto_path=. \
+//     --go_out=. --go_opt=paths=source_relative \
+//     internal/raft/proto/raft.proto
+//
+// Requires protoc-gen-go:
+//
+//   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+//
+// If a service is added, install protoc-gen-go-grpc and also pass
+// --go-grpc_out=. --go-grpc_opt=paths=source_relative to generate the
+// client stub and server skeleton.
+
+syntax = "proto3";
+
+package raft;
+
+option go_package = "github.com/IvanObreshkov/raft-lease-guard/internal/raft/proto;raftpb";
+
+// RaftMessage is the envelope for every message exchanged between nodes.
+// It carries the paper's common RPC fields: `term` is the sender's
+// currentTerm (an argument in requests, the "currentTerm, for the caller
+// to update itself" in responses), and `from` identifies the sender
+// (the paper's candidateId in RequestVote and leaderId in AppendEntries).
+message RaftMessage {
+  // Sender Node ID
+  uint64 from = 1;
+  // Recipient Node ID
+  uint64 to = 2;
+  // Sender's currentTerm
+  uint64 term = 3;
+
+  oneof payload {
+    RequestVoteRequest request_vote = 4;
+    RequestVoteResponse request_vote_response = 5;
+    AppendEntriesRequest append_entries = 6;
+    AppendEntriesResponse append_entries_response = 7;
+  }
+}
+
+// RequestVoteRequest is invoked by candidates to gather votes (§5.2).
+// The candidate's term and candidateId are carried by the enclosing
+// RaftMessage (`term` and `from`).
+message RequestVoteRequest {
+  // Index of candidate's last log entry (§5.4).
+  uint64 last_log_index = 1;
+  // Term of candidate's last log entry (§5.4).
+  uint64 last_log_term = 2;
+}
+
+// RequestVoteResponse is the result of a RequestVote RPC. The voter's
+// currentTerm, for the candidate to update itself, is carried by the
+// enclosing RaftMessage (`term`).
+message RequestVoteResponse {
+  // True means candidate received vote.
+  bool vote_granted = 1;
+}
+
+// LogEntry is a single entry in the replicated log. Each entry contains
+// a command for the state machine, and the term when the entry was
+// received by the leader; the first index is 1 (§5.3).
+message LogEntry {
+  // Position of the entry in the log.
+  uint64 index = 1;
+  // Term when the entry was received by the leader.
+  uint64 term = 2;
+  // Command for the state machine, opaque to Raft.
+  bytes command = 3;
+}
+
+// AppendEntriesRequest is invoked by the leader to replicate log entries
+// (§5.3); also used as heartbeat (§5.2). The leader's term and leaderId
+// are carried by the enclosing RaftMessage (`term` and `from`); followers
+// use the leader ID to redirect clients.
+message AppendEntriesRequest {
+  // Index of log entry immediately preceding new ones.
+  uint64 prev_log_index = 1;
+  // Term of prev_log_index entry.
+  uint64 prev_log_term = 2;
+  // Log entries to store (empty for heartbeat; may send more than one
+  // for efficiency).
+  repeated LogEntry entries = 3;
+  // Leader's commitIndex.
+  uint64 leader_commit = 4;
+}
+
+// AppendEntriesResponse is the result of an AppendEntries RPC. The
+// follower's currentTerm, for the leader to update itself, is carried
+// by the enclosing RaftMessage (`term`).
+message AppendEntriesResponse {
+  // True if follower contained entry matching prev_log_index and
+  // prev_log_term.
+  bool success = 1;
+}
