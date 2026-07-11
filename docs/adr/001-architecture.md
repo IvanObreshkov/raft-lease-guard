@@ -24,11 +24,8 @@ On each iteration of the loop the [HasReady()]() function is called, which check
 so that they could be stored via a single write operation to durable storage.
 This is a great optimization, but I will not focus on it, at least for now, as I want to first implement all the core parts correctly. This project is also solely for learning purposes, and is not intended for Production use.
 
-- **HashiCorp-style framework with multiple goroutines and direct I/O inside Raft.** Rejected because it tangles protocol logic with concurrency mechanism and makes DST painful — DST requires a single-threaded core with controllable inputs.
-
-
 Instead, I decided to do something simpler, inspired by the interface of [h11](https://github.com/python-hyper/h11), a Sans-I/O implementation of the HTTP/1.1 protocol in Python.
-h11 exposes its state machine through methods like next_event()](https://github.com/python-hyper/h11/blob/62c5068c971579d61fa1b55373390e12f25fd856/h11/_connection.py#L438) (which advances internal state and returns the next parsed event) and [send(event)](https://github.com/python-hyper/h11/blob/62c5068c971579d61fa1b55373390e12f25fd856/h11/_connection.py#L508) (which advances state and returns bytes to write).
+h11 exposes its state machine through methods like [next_event()](https://github.com/python-hyper/h11/blob/62c5068c971579d61fa1b55373390e12f25fd856/h11/_connection.py#L438) (which advances internal state and returns the next parsed event) and [send(event)](https://github.com/python-hyper/h11/blob/62c5068c971579d61fa1b55373390e12f25fd856/h11/_connection.py#L508) (which advances state and returns bytes to write).
 
 I am going to model my Raft implementation as a [Mealy machine](https://en.wikipedia.org/wiki/Mealy_machine). This is a Finite State Machine (FSM), whose outputs depend on both the inputs to the machine, and the current state of the machine. Here is what I mean:
 ```go
