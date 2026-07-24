@@ -2,19 +2,17 @@
 // Figure 2 of "In Search of an Understandable Consensus Algorithm"
 // (Ongaro and Ousterhout, 2014).
 //
-// To regenerate Go code, run from the repository root:
+// To regenerate Go code, run this from the repository root. Keep it on ONE
+// line: a trailing space after a "\" line-continuation makes zsh treat each
+// flag as its own command (the "command not found: --go_out=." error).
 //
-//   protoc --proto_path=. \
-//     --go_out=. --go_opt=paths=source_relative \
-//     internal/raft/proto/raft.proto
+//   protoc --proto_path=. --go_out=. --go_opt=paths=source_relative --go-grpc_out=. --go-grpc_opt=paths=source_relative internal/raft/proto/raft.proto
 //
-// Requires protoc-gen-go:
+// This writes raft.pb.go (message types) and raft_grpc.pb.go (client stubs +
+// server service code). Requires both plugins on your PATH:
 //
 //   go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-//
-// If a service is added, install protoc-gen-go-grpc and also pass
-// --go-grpc_out=. --go-grpc_opt=paths=source_relative to generate the
-// client stub and server skeleton.
+//   go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 
 syntax = "proto3";
 
@@ -96,4 +94,13 @@ message AppendEntriesResponse {
   // True if follower contained entry matching prev_log_index and
   // prev_log_term.
   bool success = 1;
+}
+
+// A contract between the gRPC Server and Client
+service RaftRPC {
+  // RequestVote RPC (Section 5.2 from the [Raft paper](https://raft.github.io/raft.pdf))
+  rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
+
+  // AppendEntries RPC (Section 5.3 from the [Raft paper](https://raft.github.io/raft.pdf))
+  rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
 }
