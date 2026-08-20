@@ -18,6 +18,8 @@ syntax = "proto3";
 
 package raft;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/IvanObreshkov/raft-lease-guard/internal/raft/proto;raftpb";
 
 // RaftMessage is the envelope for every message exchanged between nodes.
@@ -96,11 +98,11 @@ message AppendEntriesResponse {
   bool success = 1;
 }
 
-// A contract between the gRPC Server and Client
+// RaftRPC is the peer-to-peer transport. Every node runs this server and dials
+// every other node's. A node "receives" by handling its peers' Send calls; a
+// Raft reply travels later as a separate Send in the other direction.
 service RaftRPC {
-  // RequestVote RPC (Section 5.2 from the [Raft paper](https://raft.github.io/raft.pdf))
-  rpc RequestVote(RequestVoteRequest) returns (RequestVoteResponse);
-
-  // AppendEntries RPC (Section 5.3 from the [Raft paper](https://raft.github.io/raft.pdf))
-  rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse);
+  // Send delivers one RaftMessage to this peer. The reply is empty — Raft
+  // responses are themselves RaftMessages, sent back independently.
+  rpc Send(RaftMessage) returns (google.protobuf.Empty);
 }

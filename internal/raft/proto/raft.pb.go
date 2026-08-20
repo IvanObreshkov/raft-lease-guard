@@ -25,6 +25,7 @@ package raftpb
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -484,7 +485,7 @@ var File_internal_raft_proto_raft_proto protoreflect.FileDescriptor
 
 const file_internal_raft_proto_raft_proto_rawDesc = "" +
 	"\n" +
-	"\x1einternal/raft/proto/raft.proto\x12\x04raft\"\xfc\x02\n" +
+	"\x1einternal/raft/proto/raft.proto\x12\x04raft\x1a\x1bgoogle/protobuf/empty.proto\"\xfc\x02\n" +
 	"\vRaftMessage\x12\x12\n" +
 	"\x04from\x18\x01 \x01(\x04R\x04from\x12\x0e\n" +
 	"\x02to\x18\x02 \x01(\x04R\x02to\x12\x12\n" +
@@ -509,10 +510,9 @@ const file_internal_raft_proto_raft_proto_rawDesc = "" +
 	"\aentries\x18\x03 \x03(\v2\x0e.raft.LogEntryR\aentries\x12#\n" +
 	"\rleader_commit\x18\x04 \x01(\x04R\fleaderCommit\"1\n" +
 	"\x15AppendEntriesResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess2\x97\x01\n" +
-	"\aRaftRPC\x12B\n" +
-	"\vRequestVote\x12\x18.raft.RequestVoteRequest\x1a\x19.raft.RequestVoteResponse\x12H\n" +
-	"\rAppendEntries\x12\x1a.raft.AppendEntriesRequest\x1a\x1b.raft.AppendEntriesResponseBFZDgithub.com/IvanObreshkov/raft-lease-guard/internal/raft/proto;raftpbb\x06proto3"
+	"\asuccess\x18\x01 \x01(\bR\asuccess2<\n" +
+	"\aRaftRPC\x121\n" +
+	"\x04Send\x12\x11.raft.RaftMessage\x1a\x16.google.protobuf.EmptyBFZDgithub.com/IvanObreshkov/raft-lease-guard/internal/raft/proto;raftpbb\x06proto3"
 
 var (
 	file_internal_raft_proto_raft_proto_rawDescOnce sync.Once
@@ -534,6 +534,7 @@ var file_internal_raft_proto_raft_proto_goTypes = []any{
 	(*LogEntry)(nil),              // 3: raft.LogEntry
 	(*AppendEntriesRequest)(nil),  // 4: raft.AppendEntriesRequest
 	(*AppendEntriesResponse)(nil), // 5: raft.AppendEntriesResponse
+	(*emptypb.Empty)(nil),         // 6: google.protobuf.Empty
 }
 var file_internal_raft_proto_raft_proto_depIdxs = []int32{
 	1, // 0: raft.RaftMessage.request_vote:type_name -> raft.RequestVoteRequest
@@ -541,12 +542,10 @@ var file_internal_raft_proto_raft_proto_depIdxs = []int32{
 	4, // 2: raft.RaftMessage.append_entries:type_name -> raft.AppendEntriesRequest
 	5, // 3: raft.RaftMessage.append_entries_response:type_name -> raft.AppendEntriesResponse
 	3, // 4: raft.AppendEntriesRequest.entries:type_name -> raft.LogEntry
-	1, // 5: raft.RaftRPC.RequestVote:input_type -> raft.RequestVoteRequest
-	4, // 6: raft.RaftRPC.AppendEntries:input_type -> raft.AppendEntriesRequest
-	2, // 7: raft.RaftRPC.RequestVote:output_type -> raft.RequestVoteResponse
-	5, // 8: raft.RaftRPC.AppendEntries:output_type -> raft.AppendEntriesResponse
-	7, // [7:9] is the sub-list for method output_type
-	5, // [5:7] is the sub-list for method input_type
+	0, // 5: raft.RaftRPC.Send:input_type -> raft.RaftMessage
+	6, // 6: raft.RaftRPC.Send:output_type -> google.protobuf.Empty
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
 	5, // [5:5] is the sub-list for extension extendee
 	0, // [0:5] is the sub-list for field type_name

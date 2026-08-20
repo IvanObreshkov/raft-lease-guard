@@ -27,6 +27,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -35,20 +36,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	RaftRPC_RequestVote_FullMethodName   = "/raft.RaftRPC/RequestVote"
-	RaftRPC_AppendEntries_FullMethodName = "/raft.RaftRPC/AppendEntries"
+	RaftRPC_Send_FullMethodName = "/raft.RaftRPC/Send"
 )
 
 // RaftRPCClient is the client API for RaftRPC service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// A contract between the gRPC Server and Client
+// RaftRPC is the peer-to-peer transport. Every node runs this server and dials
+// every other node's. A node "receives" by handling its peers' Send calls; a
+// Raft reply travels later as a separate Send in the other direction.
 type RaftRPCClient interface {
-	// RequestVote RPC (Section 5.2 from the [Raft paper](https://raft.github.io/raft.pdf))
-	RequestVote(ctx context.Context, in *RequestVoteRequest, opts ...grpc.CallOption) (*RequestVoteResponse, error)
-	// AppendEntries RPC (Section 5.3 from the [Raft paper](https://raft.github.io/raft.pdf))
-	AppendEntries(ctx context.Context, in *AppendEntriesRequest, opts ...grpc.CallOption) (*AppendEntriesResponse, error)
+	// Send delivers one RaftMessage to this peer. The reply is empty — Raft
+	// responses are themselves RaftMessages, sent back independently.
+	Send(ctx context.Context, in *RaftMessage, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type raftRPCClient struct {
@@ -59,20 +60,10 @@ func NewRaftRPCClient(cc grpc.ClientConnInterface) RaftRPCClient {
 	return &raftRPCClient{cc}
 }
 
-func (c *raftRPCClient) RequestVote(ctx context.Context, in *RequestVoteRequest, opts ...grpc.CallOption) (*RequestVoteResponse, error) {
+func (c *raftRPCClient) Send(ctx context.Context, in *RaftMessage, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(RequestVoteResponse)
-	err := c.cc.Invoke(ctx, RaftRPC_RequestVote_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *raftRPCClient) AppendEntries(ctx context.Context, in *AppendEntriesRequest, opts ...grpc.CallOption) (*AppendEntriesResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AppendEntriesResponse)
-	err := c.cc.Invoke(ctx, RaftRPC_AppendEntries_FullMethodName, in, out, cOpts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, RaftRPC_Send_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -83,12 +74,13 @@ func (c *raftRPCClient) AppendEntries(ctx context.Context, in *AppendEntriesRequ
 // All implementations must embed UnimplementedRaftRPCServer
 // for forward compatibility.
 //
-// A contract between the gRPC Server and Client
+// RaftRPC is the peer-to-peer transport. Every node runs this server and dials
+// every other node's. A node "receives" by handling its peers' Send calls; a
+// Raft reply travels later as a separate Send in the other direction.
 type RaftRPCServer interface {
-	// RequestVote RPC (Section 5.2 from the [Raft paper](https://raft.github.io/raft.pdf))
-	RequestVote(context.Context, *RequestVoteRequest) (*RequestVoteResponse, error)
-	// AppendEntries RPC (Section 5.3 from the [Raft paper](https://raft.github.io/raft.pdf))
-	AppendEntries(context.Context, *AppendEntriesRequest) (*AppendEntriesResponse, error)
+	// Send delivers one RaftMessage to this peer. The reply is empty — Raft
+	// responses are themselves RaftMessages, sent back independently.
+	Send(context.Context, *RaftMessage) (*emptypb.Empty, error)
 	mustEmbedUnimplementedRaftRPCServer()
 }
 
@@ -99,11 +91,8 @@ type RaftRPCServer interface {
 // pointer dereference when methods are called.
 type UnimplementedRaftRPCServer struct{}
 
-func (UnimplementedRaftRPCServer) RequestVote(context.Context, *RequestVoteRequest) (*RequestVoteResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method RequestVote not implemented")
-}
-func (UnimplementedRaftRPCServer) AppendEntries(context.Context, *AppendEntriesRequest) (*AppendEntriesResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method AppendEntries not implemented")
+func (UnimplementedRaftRPCServer) Send(context.Context, *RaftMessage) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Send not implemented")
 }
 func (UnimplementedRaftRPCServer) mustEmbedUnimplementedRaftRPCServer() {}
 func (UnimplementedRaftRPCServer) testEmbeddedByValue()                 {}
@@ -126,38 +115,20 @@ func RegisterRaftRPCServer(s grpc.ServiceRegistrar, srv RaftRPCServer) {
 	s.RegisterService(&RaftRPC_ServiceDesc, srv)
 }
 
-func _RaftRPC_RequestVote_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RequestVoteRequest)
+func _RaftRPC_Send_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RaftMessage)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(RaftRPCServer).RequestVote(ctx, in)
+		return srv.(RaftRPCServer).Send(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: RaftRPC_RequestVote_FullMethodName,
+		FullMethod: RaftRPC_Send_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RaftRPCServer).RequestVote(ctx, req.(*RequestVoteRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _RaftRPC_AppendEntries_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(AppendEntriesRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(RaftRPCServer).AppendEntries(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: RaftRPC_AppendEntries_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RaftRPCServer).AppendEntries(ctx, req.(*AppendEntriesRequest))
+		return srv.(RaftRPCServer).Send(ctx, req.(*RaftMessage))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -170,12 +141,8 @@ var RaftRPC_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*RaftRPCServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "RequestVote",
-			Handler:    _RaftRPC_RequestVote_Handler,
-		},
-		{
-			MethodName: "AppendEntries",
-			Handler:    _RaftRPC_AppendEntries_Handler,
+			MethodName: "Send",
+			Handler:    _RaftRPC_Send_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
