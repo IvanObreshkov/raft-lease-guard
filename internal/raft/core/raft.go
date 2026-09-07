@@ -1,8 +1,6 @@
 package core
 
 import (
-	"time"
-
 	raftpb "github.com/IvanObreshkov/raft-lease-guard/internal/raft/proto"
 )
 
@@ -34,38 +32,36 @@ type RaftVolatileState struct {
 	LastApplied uint64
 }
 
-// RaftVolatileStateLeader is the non-persisted state of a Leader Raft server, it is reinitialized after an election
-type RaftVolatileStateLeader struct {
-	// NextIndex is, for each server, index of the next log entry to send to that server (initialized to leader last
-	// log index + 1) as per Figure 2 from the [Raft paper](https://raft.github.io/raft.pdf)
-	NextIndex map[ServerID]uint64
-	// MatchIndex is, for each server, index of highest log entry known to be replicated on server (initialized to 0,
-	// increases monotonically) as per Figure 2 from the [Raft paper](https://raft.github.io/raft.pdf)
-	MatchIndex map[ServerID]uint64
-}
-
 // RaftState is the complete state of a Raft server: the persistent and volatile state that every server keeps, the volatile
 // state kept only while it is the leader, and its current ServerState. See Figure 2 from the
 // [Raft paper](https://raft.github.io/raft.pdf).
 type RaftState struct {
 	RaftPersistedState
 	RaftVolatileState
-	// LeaderState is the volatile leader state; it is non-nil only while State is Leader, and is reinitialized after
-	// each election, as per Figure 2 from the [Raft paper](https://raft.github.io/raft.pdf).
-	LeaderState *RaftVolatileStateLeader
 	// State is the current state of the server: Follower, Candidate, or Leader, as per Section 5.1 from the
 	// [Raft paper](https://raft.github.io/raft.pdf). A server starts as a Follower, as per Section 5.2.
 	State ServerState
-	// ElectionTimeout is the current election timeout for the server. It is randomly chosen when the server is created.
-	// It should be used with a time.Timer, and the timer should be reset at the beginning of each new election and
-	// when the server receives an AppendEntries RPC, as per Section 5.2 from the
-	// [Raft paper](https://raft.github.io/raft.pdf). It only makes sense when Server is Follower or Candidate.
-	ElectionTimeout time.Duration
 }
-// TODO: Add the Transition Func
 
-type RaftServer struct {
-	raftpb.UnimplementedRaftRPCServer
-	State RaftState
-	// TODO: Design the Transport layer interface and the main_loop of the server (one goroutine iterating over channels and calling Transition)
+// Raft is the consensus core, It performs no I/O of its own; Transition mutates this state and returns the
+// actions for a Server to carry out.
+type Raft struct {
+	RaftState
+	// ID is this server's own ID. A transition needs it to vote for itself when starting an election, as per Section 5.2
+	// from the [Raft paper](https://raft.github.io/raft.pdf), and to stamp `from` on every outgoing RaftMessage.
+	ID ServerID
+	// Servers are all the servers in the cluster, including this one. Counting a majority is therefore
+	// len(Servers)/2 + 1, with no adjustment for self, and the leader's own log counts towards a commit like any
+	// follower's. Only the loops that "send RPCs to all other servers" (Section 5.2 from the
+	// [Raft paper](https://raft.github.io/raft.pdf)) skip ID. It is a slice and not a map so the iteration order is
+	// fixed, which keeps the actions a transition returns deterministic.
+	Servers []ServerID
+}
+
+// Transition applies event to this server and reports what the Server must do as a result, as per the Rules for Servers
+// in Figure 2 of the [Raft paper](https://raft.github.io/raft.pdf). It mutates the state in place and performs no I/O,
+// so the only caller may be the single goroutine that owns this Raft.
+func (r *Raft) Transition(event Event) Effects {
+	// TODO: implement the Rules for Servers.
+	return Effects{}
 }
