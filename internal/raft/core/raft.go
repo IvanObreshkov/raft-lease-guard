@@ -1,6 +1,10 @@
+// Package core is the Raft state machine without any I/O: it consumes Events and mutates its state in place.
 package core
 
 import (
+	"errors"
+	"fmt"
+
 	raftpb "github.com/IvanObreshkov/raft-lease-guard/internal/raft/proto"
 )
 
@@ -11,7 +15,7 @@ type RaftPersistedState struct {
 	// monotonically, as per Figure 2 and Section 5.1 from the [Raft paper](https://raft.github.io/raft.pdf). It serves
 	// as a [logical clock](https://dl.acm.org/doi/pdf/10.1145/359545.359563) that lets servers detect obsolete
 	// information, such as a stale leader.
-	CurrentTerm int64
+	CurrentTerm uint64
 	// VotedFor is the candidateId (ServerID) that received this server's vote in the current term, or nil if it has not
 	// voted, as per Figure 2 from the [Raft paper](https://raft.github.io/raft.pdf). Votes are per term, so it is reset
 	// to nil whenever CurrentTerm changes.
@@ -32,36 +36,62 @@ type RaftVolatileState struct {
 	LastApplied uint64
 }
 
-// RaftState is the complete state of a Raft server: the persistent and volatile state that every server keeps, the volatile
-// state kept only while it is the leader, and its current ServerState. See Figure 2 from the
+// RaftState is the complete state of a Raft server: the persistent and volatile state that every server keeps, and its
+// current ServerState, which carries whatever is specific to that state. See Figure 2 from the
 // [Raft paper](https://raft.github.io/raft.pdf).
 type RaftState struct {
 	RaftPersistedState
 	RaftVolatileState
-	// State is the current state of the server: Follower, Candidate, or Leader, as per Section 5.1 from the
-	// [Raft paper](https://raft.github.io/raft.pdf). A server starts as a Follower, as per Section 5.2.
-	State ServerState
+	// ServerState is the current state of the server: *Follower, *Candidate, or *Leader, as per Section 5.1 from the
+	// [Raft paper](https://raft.github.io/raft.pdf). It is never nil: a server starts as a Follower, as per Section 5.2.
+	ServerState ServerState
 }
 
-// Raft is the consensus core, It performs no I/O of its own; Transition mutates this state and returns the
-// actions for a Server to carry out.
+// ElectionTicksDraw returns how many Ticks a new Follower or Candidate waits before starting an election. The result
+// must be greater than 0. The Server supplies a random draw from [electionTicks, 2*electionTicks), as per Section 5.2
+// from the [Raft paper](https://raft.github.io/raft.pdf).
+type ElectionTicksDraw func() int
+
+// Raft is the consensus core. It performs no I/O and reads no clock of its own: Transition mutates this state in place
+// in response to the events the Server feeds it.
 type Raft struct {
 	RaftState
-	// ID is this server's own ID. A transition needs it to vote for itself when starting an election, as per Section 5.2
-	// from the [Raft paper](https://raft.github.io/raft.pdf), and to stamp `from` on every outgoing RaftMessage.
-	ID ServerID
-	// Servers are all the servers in the cluster, including this one. Counting a majority is therefore
-	// len(Servers)/2 + 1, with no adjustment for self, and the leader's own log counts towards a commit like any
-	// follower's. Only the loops that "send RPCs to all other servers" (Section 5.2 from the
-	// [Raft paper](https://raft.github.io/raft.pdf)) skip ID. It is a slice and not a map so the iteration order is
-	// fixed, which keeps the actions a transition returns deterministic.
-	Servers []ServerID
+	// drawElectionTicks is the only source of election timeouts. The core holds no random source of its own.
+	drawElectionTicks ElectionTicksDraw
+	// heartbeatTicks is how many Ticks a Leader lets pass between heartbeats. Always greater than 0.
+	heartbeatTicks int
 }
 
-// Transition applies event to this server and reports what the Server must do as a result, as per the Rules for Servers
-// in Figure 2 of the [Raft paper](https://raft.github.io/raft.pdf). It mutates the state in place and performs no I/O,
-// so the only caller may be the single goroutine that owns this Raft.
-func (r *Raft) Transition(event Event) Effects {
-	// TODO: implement the Rules for Servers.
-	return Effects{}
+// NewRaft returns a server that starts as a Follower, as per Section 5.2 from the
+// [Raft paper](https://raft.github.io/raft.pdf), with its first election timeout already drawn. It rejects a nil draw
+// and a non-positive heartbeatTicks here, because either would otherwise surface as a leader or follower that never
+// times out.
+func NewRaft(drawElectionTicks ElectionTicksDraw, heartbeatTicks int) (*Raft, error) {
+	if drawElectionTicks == nil {
+		return nil, errors.New("drawElectionTicks must not be nil")
+	}
+	if heartbeatTicks <= 0 {
+		return nil, fmt.Errorf("heartbeatTicks must be greater than 0, got %d", heartbeatTicks)
+	}
+	r := &Raft{drawElectionTicks: drawElectionTicks, heartbeatTicks: heartbeatTicks}
+	r.ServerState = &Follower{TicksUntilElection: r.drawElectionTicks()}
+	return r, nil
+}
+
+// Transition applies event to this server, as per the Rules for Servers in Figure 2 from the
+// [Raft paper](https://raft.github.io/raft.pdf). It mutates the state in place and performs no I/O, so the only caller
+// may be the single goroutine that owns this Raft.
+func (r *Raft) Transition(event Event) {
+	// TODO: the All Servers rules from Figure 2. A message whose term is greater than CurrentTerm makes this server
+	// adopt that term and become a Follower before the dispatch below, so the message is then handled as a Follower
+	// whatever this server was a moment ago.
+
+	switch st := r.ServerState.(type) {
+	case *Follower:
+		st.transition(r, event)
+	case *Candidate:
+		// TODO: st.transition(r, event), once candidate.go defines it.
+	case *Leader:
+		// TODO: st.transition(r, event), once leader.go defines it.
+	}
 }
