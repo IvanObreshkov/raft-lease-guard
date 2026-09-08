@@ -14,10 +14,8 @@ type ServerState interface {
 	isServerState()
 }
 
-type Follower struct{}
-
-func (*Follower) isServerState() {}
-
+// Candidate is a server running an election for CurrentTerm, as per Section 5.2 from the
+// [Raft paper](https://raft.github.io/raft.pdf).
 type Candidate struct{}
 
 func (*Candidate) isServerState() {}
@@ -31,16 +29,21 @@ type raftVolatileStateLeader struct {
 	// increases monotonically) as per Figure 2 from the [Raft paper](https://raft.github.io/raft.pdf)
 	MatchIndex map[ServerID]uint64
 }
+
+// Leader is the server that handles client requests and replicates the log, as per Section 5.1 from the
+// [Raft paper](https://raft.github.io/raft.pdf).
 type Leader struct {
 	raftVolatileStateLeader
 }
 
 func (*Leader) isServerState() {}
 
-// Event is one input to the state machine: a message that arrived from another server, or a timer that fired. The set of
-// variants is closed to this package, so a type switch in Transition covers every input there is.
+// Event is one input to the state machine: a message that arrived from another server, or one tick of the clock. The
+// set of variants is closed to this package, so a type switch in Transition covers every input there is.
 //
-// TODO: add the remaining variants, such as a leader's heartbeat tick and a command from a client.
+// TODO: add the remaining variants, such as a command from a client.
+//
+//sumtype:decl
 type Event interface {
 	isEvent()
 }
@@ -52,8 +55,8 @@ type MessageReceived struct {
 
 func (MessageReceived) isEvent() {}
 
-// ElectionTimeout is the election timer firing without word from a leader, which is what starts an election, as per
-// Section 5.2 from the [Raft paper](https://raft.github.io/raft.pdf).
-type ElectionTimeout struct{}
+// Tick reports that one TickInterval of real time has passed. The core measures every timeout in Ticks and keeps no
+// clock of its own.
+type Tick struct{}
 
-func (ElectionTimeout) isEvent() {}
+func (Tick) isEvent() {}
