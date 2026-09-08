@@ -14,7 +14,6 @@ import (
 )
 
 // gRPCInboundTransport receives by serving peers' Send calls: nothing is called to receive, messages arrive on Inbound.
-
 type gRPCInboundTransport struct {
 	// Required to implement raftpb.RaftRPCServer.
 	raftpb.UnimplementedRaftRPCServer
@@ -105,8 +104,7 @@ func (t *gRPCOutboundTransport) Close() error {
 	return errors.Join(closeErrors...)
 }
 
-// GRPCTransport puts both halves behind one value, so a Server can be handed a single core.Transport instead of a
-// sending half and a receiving half.
+// GRPCTransport puts both halves behind one value, so a Server can be handed a single raft.Transport
 type GRPCTransport struct {
 	*gRPCInboundTransport
 	*gRPCOutboundTransport
